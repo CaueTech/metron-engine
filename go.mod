@@ -1,4 +1,4 @@
-module github.com/CaueTech/celer-engine
+module github.com/CaueTech/metron-engine
 
 go 1.25.0
 
