@@ -16,11 +16,11 @@ var (
 	lastEventID uuid.UUID
 )
 
-func initValidator (sourceID * uuid.UUID, eventType * domain.EventType) (error){
-	if *sourceID == uuid.Nil {
+func initValidator (sourceID uuid.UUID, eventType domain.EventType) (error){
+	if sourceID == uuid.Nil {
 		return ErrEmptySourceID
 	}
-	if !(*eventType).IsValid() {
+	if !eventType.IsValid() {
 		return ErrInvalidEventType
 	}
 	return nil
@@ -33,12 +33,12 @@ func randomTimestamp() time.Time {
 }
 
 func NewEvent(sourceID uuid.UUID, eventType domain.EventType) (*domain.Event, error) {
-	if sourceID == uuid.Nil {
-		return nil, ErrEmptySourceID
+	err := initValidator(sourceID, eventType)
+
+	if err != nil{
+		return nil, err
 	}
-	if !eventType.IsValid() {
-		return nil, ErrInvalidEventType
-	}
+
 	chaosIndex := rand.Float32()
 	eventID := uuid.New()
 	evSourceID := sourceID

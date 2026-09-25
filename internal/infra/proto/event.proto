@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package metron.event.v1;
+
+option go_package = "github.com/CaueTech/metron-engine/internal/infra/proto;proto";
+
+enum EventType {
+  EVENT_TYPE_UNKNOWN = 0;
+  EVENT_TYPE_OVERHEAT = 1;
+  EVENT_TYPE_MECHANICAL_WARNING = 2;
+  EVENT_TYPE_VOLTAGE_DROP = 3;
+}
+
+message Event {
+  string id = 1;
+  string source_id = 2;
+  EventType event_type = 3;
+  int64 timestamp_unix_ms = 4; // Milissegundos desde a época Unix
+}
