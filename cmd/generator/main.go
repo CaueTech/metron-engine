@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/CaueTech/metron-engine/internal/application/generator"
 	"github.com/CaueTech/metron-engine/internal/domain"
@@ -63,10 +62,10 @@ func main() {
 
 			// 1. Mapeia a entidade de domínio para a mensagem Protobuf gerada
 			protoMsg := &eventv1.Event{
-				Id:        event.ID().String(),
-				SourceId:  event.SourceID().String(),
-				EventType: eventv1.EventType(event.Type()),
-				Timestamp: timestamppb.New(event.Timestamp()),
+				Id:              event.ID().String(),
+				SourceId:        event.SourceID().String(),
+				EventType:       eventv1.EventType(event.Type()),
+				TimestampUnixMs: event.Timestamp().UnixMilli(), // Converte time.Time para int64 (milissegundos)
 			}
 
 			// 2. Serializa em formato binário compacto
