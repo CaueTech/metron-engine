@@ -34,7 +34,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKERS: kafka:29092
-      KAFKA_TOPIC: events
+      KAFKA_TOPIC: gen-pool
       GENERATOR_COOLDOWN: 30s
 
   # Leaving engine ready but in standby for now
@@ -47,7 +47,7 @@ services:
   #       condition: service_healthy
   #   environment:
   #     KAFKA_BROKERS: kafka:29092
-  #     KAFKA_INPUT_TOPIC: events
+  #     KAFKA_INPUT_TOPIC: gen-pool
   #     KAFKA_CONSUMER_GROUP: metron-engine
   #     KAFKA_ALERTS_TOPIC: alerts
   #     KAFKA_DLQ_TOPIC: dlq
