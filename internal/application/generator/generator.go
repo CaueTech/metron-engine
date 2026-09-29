@@ -32,18 +32,30 @@ func randomTimestamp() time.Time {
 	return time.Unix(sec, 0).UTC()
 }
 
-func NewEvent(sourceID uuid.UUID, eventType domain.EventType) (*domain.Event, error) {
+// Used named return explictly because it would be too confusing if not
+func generateData() (eventID uuid.UUID, sourceID uuid.UUID, eventType domain.EventType, timestamp time.Time, value float32) {
+	chaosIndex := rand.Float32()
+	validTypesCount := int(domain.maxEventType) - 1
+
+	eventID = uuid.New()
+	sourceID = uuid.New()
+	eventType = domain.EventType(rand.IntN(validTypesCount) + 1)
+	timestamp = time.Now().UTC()
+	value = chaosIndex
+
+	return eventID, sourceID, eventType, timestamp, value
+}
+
+func GenerateEvent() (*domain.Event, error) {
+	eventID, sourceID, eventType, timestamp, value := generateData()
+
 	err := initValidator(sourceID, eventType)
 
 	if err != nil{
 		return nil, err
 	}
-
-	chaosIndex := rand.Float32()
-	eventID := uuid.New()
-	evSourceID := sourceID
-	evType := eventType
-	evTimestamp := time.Now().UTC()
+	
+	// Level of data corruption based on chaosIndex
 	switch {
 	case chaosIndex < 0.80:
 		// All OK
@@ -65,6 +77,7 @@ func NewEvent(sourceID uuid.UUID, eventType domain.EventType) (*domain.Event, er
 		evType = domain.EventTypeUnknown
 		evTimestamp = time.Time{}
 	}
+
 	// Updates history
 	if eventID != uuid.Nil && chaosIndex < 0.90 {
 		lastEventID = eventID
