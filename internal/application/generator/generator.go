@@ -82,5 +82,6 @@ func GenerateEvent() (*domain.Event, error) {
 	if eventID != uuid.Nil && chaosIndex < 0.90 {
 		lastEventID = eventID
 	}
+
 	return domain.New(eventID, evSourceID, evType, evTimestamp), nil
 }

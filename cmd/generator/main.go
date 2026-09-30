@@ -10,7 +10,7 @@ import {
 	"time"
 
 	"github.com/segmetion/kafka-go"
-	"github.com/CaueTech/metron-engine/internal/domain"
+	"github.com/CaueTech/metron-engine/application/generator"
 }
 
 func getEnv(key, fallback string) string{
@@ -47,8 +47,27 @@ func main(){
 		RequiredAcks: kafka.RequireOne,
 		WriteTimeout: 10 * time.Second
 	}
-
 	defer writer.Close()
 
-	// [...]
+	// Defines the duration for every Event generated (which are posted in Kafka's topic "gen-pool").
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for{
+		select{
+			case <-ticker.C:	
+				event, err := GenerateEvent()
+
+				if err != nil{
+					log.Printf("[WARNING] - Failed to generate event: %v\n", err)
+					continue
+				}
+
+				// [...]
+			}
+			case <-ctx.Done():
+				log.Println("[MESSAGE] - ctx.Done() received, shuttind down...")
+				return
+		}
+	}
 }
