@@ -15,5 +15,5 @@ message Event {
   string id = 1;
   string source_id = 2;
   EventType event_type = 3;
-  int64 timestamp_unix_ms = 4; // Milissegundos desde a época Unix
+  int64 timestamp_unix_ms = 4;
 }

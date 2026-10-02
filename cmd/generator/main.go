@@ -1,4 +1,3 @@
-go
 package main
 
 import {
@@ -9,8 +8,12 @@ import {
 	"strings"
 	"time"
 
-	"github.com/segmetion/kafka-go"
+	"github.com/CaueTech/metron-engine/infra/kafka"
 	"github.com/CaueTech/metron-engine/application/generator"
+}
+
+var{
+	processLog := "generator" 
 }
 
 func getEnv(key, fallback string) string{
@@ -33,20 +36,13 @@ func main(){
 		This strings.Split() simulates a case where there are multiple Kafka brokers in a cluster, even though the project only needs a single Kafka instance at the moment.
 	*/
 
-	log.Printf("Conectando ao Kafka nos brokers: %v | Tópico: %s", brokers, topic)
+	log.Printf("[MESSAGE - %s] Connecting Kafka in brokers: %v | Topic: %s", processLog, brokers, topic)
 
 	/* 
 		The & operator applies to the object from the kafka package, such as Writer or LeastBytes{}.
 	*/
 	
-	writer := &kafka.Writer{
-		// Here the brokers are unpacked in case it contains more than one element.
-		Addr: kafka.TCP(brokers...),
-		Topic: topic,
-		Balancer: &kafka.LeastBytes{},
-		RequiredAcks: kafka.RequireOne,
-		WriteTimeout: 10 * time.Second
-	}
+	writer := NewKafkaWriter(brokers, topic)
 	defer writer.Close()
 
 	// Defines the duration for every Event generated (which are posted in Kafka's topic "gen-pool").
@@ -59,14 +55,14 @@ func main(){
 				event, err := GenerateEvent()
 
 				if err != nil{
-					log.Printf("[WARNING] - Failed to generate event: %v\n", err)
+					log.Printf("[WARNING - %S] - Failed to generate event: %v\n", processLog, err)
 					continue
 				}
 
-				// [...]
+				// [...] -> Build serialization + posting in Kafka "gen-pool" topic
 			}
 			case <-ctx.Done():
-				log.Println("[MESSAGE] - ctx.Done() received, shuttind down...")
+				log.Printf("[MESSAGE - %s] - ctx.Done() received, shuttind down...", processLog)
 				return
 		}
 	}
