@@ -31,7 +31,10 @@ func main(){
 	rawBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
 	topic := gentEnv("KAFKA_TOPIC", "events")
 	brokers := strings.Split(rawBrokers, ",")
-	
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// When this function ends, we stop listening to signals
+	defer stop() 
+
 	/*
 		This strings.Split() simulates a case where there are multiple Kafka brokers in a cluster, even though the project only needs a single Kafka instance at the moment.
 	*/
@@ -55,14 +58,28 @@ func main(){
 				event, err := GenerateEvent()
 
 				if err != nil{
-					log.Printf("[WARNING - %S] - Failed to generate event: %v\n", processLog, err)
+					log.Printf("[WARNING - %s] - Failed to generate event: %v\n", processLog, err)
 					continue
 				}
 
-				// [...] -> Build serialization + posting in Kafka "gen-pool" topic
+				bytes, err := Serializer(event)
+
+				message := kafka.Message{
+					Value: bytes,
+					Key: event.SourceID,
+				}
+
+				err := writer.WriteMessages(ctx, message)
+				if err != nil{
+					log.Printf("[WARNING - %s] - Failed to post bytes into Kafka", processLog)
+					continue
+				}
+
+				log.Printf("[MESSAGE - %s] - Succesfully sent bytes to Kafka", processLog)
+
 			}
 			case <-ctx.Done():
-				log.Printf("[MESSAGE - %s] - ctx.Done() received, shuttind down...", processLog)
+				log.Printf("[MESSAGE - %s] - ctx.Done() received, shutting down...", processLog)
 				return
 		}
 	}
