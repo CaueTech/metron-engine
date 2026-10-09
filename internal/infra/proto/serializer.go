@@ -1,20 +1,22 @@
 package proto
 
-import {
+import (
+	"errors"
+
 	"github.com/CaueTech/metron-engine/internal/domain"
 	"google.golang.org/protobuf/proto"
-}
+)
 
 /*
 	Note that the Event struct here is the Protobuf one, not from the domain. One is built upon the other
 */
 
-var(
-	ErrNullEvent
+var (
+	ErrNullEvent = errors.New("event cannot be nil")
 )
 
-func Serialize(event *domain.Event)([]byte, err]){
-	if event == nil{
+func Serialize(event *domain.Event) ([]byte, error) {
+	if event == nil {
 		return nil, ErrNullEvent
 	}
 

@@ -1,23 +1,24 @@
 package main
 
-import {
+import (
 	"context"
-	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/CaueTech/metron-engine/infra/kafka"
-	"github.com/CaueTech/metron-engine/application/generator"
-}
+	"github.com/CaueTech/metron-engine/internal/application/generator"
+	"github.com/CaueTech/metron-engine/internal/infra/kafka"
+)
 
-var{
-	processLog := "generator" 
-}
+var (
+	processLog = "generator"
+)
 
-func getEnv(key, fallback string) string{
-	if value, exists := os.LookupEnv(key); exists{
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
 		return value
 	}
 	return fallback
@@ -27,60 +28,42 @@ func getEnv(key, fallback string) string{
 	*/
 }
 
-func main(){
+func main() {
 	rawBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
-	topic := gentEnv("KAFKA_TOPIC", "events")
-	brokers := strings.Split(rawBrokers, ",")
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	// When this function ends, we stop listening to signals
-	defer stop() 
+	topic := getEnv("KAFKA_TOPIC", "events")
 
-	/*
-		This strings.Split() simulates a case where there are multiple Kafka brokers in a cluster, even though the project only needs a single Kafka instance at the moment.
-	*/
+	brokers := strings.Split(rawBrokers, ",")
+	// This strings.Split() simulates a case where there are multiple Kafka brokers in a cluster, even though the project only needs a single Kafka instance at the moment.
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// When this function ends, we stop listening to signals
+	defer stop()
 
 	log.Printf("[MESSAGE - %s] Connecting Kafka in brokers: %v | Topic: %s", processLog, brokers, topic)
 
-	/* 
-		The & operator applies to the object from the kafka package, such as Writer or LeastBytes{}.
-	*/
-	
-	writer := NewKafkaWriter(brokers, topic)
-	defer writer.Close()
+	publisher := kafka.NewKafkaPublisher(brokers, topic)
+	defer publisher.Close()
+
+	service := generator.NewGeneratorService(publisher)
 
 	// Defines the duration for every Event generated (which are posted in Kafka's topic "gen-pool").
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	for{
-		select{
-			case <-ticker.C:	
-				event, err := GenerateEvent()
-
-				if err != nil{
-					log.Printf("[WARNING - %s] - Failed to generate event: %v\n", processLog, err)
-					continue
-				}
-
-				bytes, err := Serializer(event)
-
-				message := kafka.Message{
-					Value: bytes,
-					Key: event.SourceID,
-				}
-
-				err := writer.WriteMessages(ctx, message)
-				if err != nil{
-					log.Printf("[WARNING - %s] - Failed to post bytes into Kafka", processLog)
-					continue
-				}
-
-				log.Printf("[MESSAGE - %s] - Succesfully sent bytes to Kafka", processLog)
-
+	for {
+		select {
+		case <-ticker.C:
+			if err := service.Run(ctx); err != nil {
+				log.Printf("[WARNING - %s] - Failed to run generator service: %v\n", processLog, err)
+				continue
 			}
-			case <-ctx.Done():
-				log.Printf("[MESSAGE - %s] - ctx.Done() received, shutting down...", processLog)
-				return
+
+			log.Printf("[MESSAGE - %s] - Event generated and published successfully\n", processLog)
+
+		case <-ctx.Done():
+			log.Printf("[MESSAGE - %s] - ctx.Done() received, shutting down...", processLog)
+			return
 		}
 	}
 }

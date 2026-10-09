@@ -13,12 +13,12 @@ const (
 	EventTypeOverheat
 	EventTypeMechanicalWarning
 	EventTypeVoltageDrop
-	maxEventType
+	MaxEventType
 )
 
 // IsValid valida se o tipo de evento está dentro das categorias discretas válidas
 func (t EventType) IsValid() bool {
-	return t > EventTypeUnknown && t < maxEventType
+	return t > EventTypeUnknown && t < MaxEventType
 }
 
 type Event struct {

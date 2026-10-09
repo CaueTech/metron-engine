@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrInvalidEventType = errors.New("invalid or unknown event type")
-	ErrEmptySourceID    = errors.New("source id cannot be empty")
+	ErrEmptySourceID = errors.New("source id cannot be empty")
 	// Store last valid ID for chaos generation
 	lastEventID uuid.UUID
 )
@@ -35,7 +35,7 @@ func randomTimestamp() time.Time {
 // Used named return explictly because it would be too confusing if not
 func generateData() (eventID uuid.UUID, sourceID uuid.UUID, eventType domain.EventType, timestamp time.Time, value float32) {
 	chaosIndex := rand.Float32()
-	validTypesCount := int(domain.maxEventType) - 1
+	validTypesCount := int(domain.MaxEventType) - 1
 
 	eventID = uuid.New()
 	sourceID = uuid.New()
@@ -47,14 +47,17 @@ func generateData() (eventID uuid.UUID, sourceID uuid.UUID, eventType domain.Eve
 }
 
 func GenerateEvent() (*domain.Event, error) {
-	eventID, sourceID, eventType, timestamp, value := generateData()
+	eventID, sourceID, eventType, timestamp, chaosIndex := generateData()
 
 	err := initValidator(sourceID, eventType)
-
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
-	
+
+	evSourceID := sourceID
+	evType := eventType
+	evTimestamp := timestamp
+
 	// Level of data corruption based on chaosIndex
 	switch {
 	case chaosIndex < 0.80:
