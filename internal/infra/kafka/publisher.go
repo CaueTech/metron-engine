@@ -9,14 +9,14 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+var (
+	ErrWriter     = errors.New("writing error ocurred while trying to publishing an event to Kafka")
+)
+
+// Wrapper to enable an Adapter when working with the generator package
 type KafkaPublisher struct {
 	writer *kafka.Writer
 }
-
-var (
-	ErrSerializer = errors.New("serialization failed when trying to publishing an event to Kafka")
-	ErrWriter     = errors.New("writing error ocurred while trying to publishing an event to Kafka")
-)
 
 func NewKafkaPublisher(brokers []string, topic string) *KafkaPublisher {
 	return &KafkaPublisher{
@@ -37,7 +37,7 @@ func (k *KafkaPublisher) Publish(ctx context.Context, event *domain.Event) error
 
 	err = k.writer.WriteMessages(ctx, message)
 	if err != nil {
-		return err
+		return ErrWriter
 	}
 
 	return nil

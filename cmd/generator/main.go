@@ -37,7 +37,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	// When this function ends, we stop listening to signals
+	// When this function ends, we stop listening to signals.
 	defer stop()
 
 	log.Printf("[MESSAGE - %s] Connecting Kafka in brokers: %v | Topic: %s", processLog, brokers, topic)
