@@ -5,16 +5,12 @@ import (
 	"github.com/CaueTech/metron-engine/internal/domain"
 )
 
-type EventPublisher interface{
-	Publish(ctx context.Context, event *domain.Event) error
+type generatorService struct {
+	publisher domain.EventPublisher
 }
 
-type GeneratorService struct {
-	publisher EventPublisher
-}
-
-func NewGeneratorService (pub EventPublisher) *GeneratorService{
-	return &GeneratorService{
+func NewGeneratorService (pub domain.EventPublisher) *generatorService{
+	return &generatorService{
 		publisher: pub,
 	}
 }
@@ -22,7 +18,7 @@ func NewGeneratorService (pub EventPublisher) *GeneratorService{
 /*
  With the following function, essentially, we can run a GeneratorService without explictly needing a Kafka infra behind, enabling unit testing and leaving the responsabilities of the layers much cleaner.
 */
-func (s *GeneratorService) Run(ctx context.Context) error{
+func (s *generatorService) Run(ctx context.Context) error{
 	event, err := GenerateEvent()
 	
 	if err != nil{

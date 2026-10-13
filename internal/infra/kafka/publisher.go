@@ -14,17 +14,17 @@ var (
 )
 
 // Wrapper to enable an Adapter when working with the generator package
-type KafkaPublisher struct {
+type PublisherAdapter struct {
 	writer *kafka.Writer
 }
 
-func NewKafkaPublisher(brokers []string, topic string) *KafkaPublisher {
-	return &KafkaPublisher{
+func NewPublisherAdapter(brokers []string, topic string) *PublisherAdapter {
+	return &PublisherAdapter{
 		writer: NewKafkaWriter(brokers, topic),
 	}
 }
 
-func (k *KafkaPublisher) Publish(ctx context.Context, event *domain.Event) error {
+func (k *PublisherAdapter) Publish(ctx context.Context, event *domain.Event) error {
 	bytes, err := proto.Serialize(event)
 	if err != nil {
 		return err
@@ -43,6 +43,6 @@ func (k *KafkaPublisher) Publish(ctx context.Context, event *domain.Event) error
 	return nil
 }
 
-func (k *KafkaPublisher) Close() error {
+func (k *PublisherAdapter) Close() error {
 	return k.writer.Close()
 }
