@@ -42,7 +42,7 @@ func main() {
 
 	log.Printf("[MESSAGE - %s] Connecting Kafka in brokers: %v | Topic: %s", processLog, brokers, topic)
 
-	publisher := kafka.NewKafkaPublisher(brokers, topic)
+	publisher := kafka.NewPublisherAdapter(brokers, topic)
 	defer publisher.Close()
 
 	service := generator.NewGeneratorService(publisher)
