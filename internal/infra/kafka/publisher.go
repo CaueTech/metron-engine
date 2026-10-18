@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
 	"github.com/CaueTech/metron-engine/internal/infra/proto"
@@ -10,7 +11,7 @@ import (
 )
 
 var (
-	ErrWriter     = errors.New("writing error ocurred while trying to publishing an event to Kafka")
+	ErrWriter = errors.New("writing error ocurred while trying to publishing an event to Kafka")
 )
 
 // Wrapper to enable an Adapter when working with the generator package
@@ -18,9 +19,20 @@ type PublisherAdapter struct {
 	writer *kafka.Writer
 }
 
+func newKafkaWriter(brokers []string, topic string) *kafka.Writer {
+	return &kafka.Writer{
+		// Here the brokers are unpacked in case it contains more than one element.
+		Addr: kafka.TCP(brokers...),
+		Topic: topic,
+		Balancer: &kafka.LeastBytes{},
+		RequiredAcks: kafka.RequireOne,
+		WriteTimeout: 10 * time.Second,
+	}
+}
+
 func NewPublisherAdapter(brokers []string, topic string) *PublisherAdapter {
 	return &PublisherAdapter{
-		writer: NewKafkaWriter(brokers, topic),
+		writer: newKafkaWriter(brokers, topic),
 	}
 }
 
