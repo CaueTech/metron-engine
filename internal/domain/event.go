@@ -29,7 +29,7 @@ type Event struct {
 }
 
 // New Event instance with internal fields
-func New(id, sourceID uuid.UUID, eventType EventType, timestamp time.Time) *Event {
+func NewEvent(id, sourceID uuid.UUID, eventType EventType, timestamp time.Time) *Event {
 	return &Event{
 		id:        id,
 		sourceID:  sourceID,

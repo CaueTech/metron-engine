@@ -86,5 +86,5 @@ func GenerateEvent() (*domain.Event, error) {
 		lastEventID = eventID
 	}
 
-	return domain.New(eventID, evSourceID, evType, evTimestamp), nil
+	return domain.NewEvent(eventID, evSourceID, evType, evTimestamp), nil
 }
