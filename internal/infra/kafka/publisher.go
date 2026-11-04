@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"time"
+	"fmt"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
 	"github.com/CaueTech/metron-engine/internal/infra/proto"
@@ -11,7 +12,8 @@ import (
 )
 
 var (
-	ErrWriter = errors.New("writing error ocurred while trying to publishing an event to Kafka")
+	ErrWriterPublish = errors.New("Writing error ocurred while trying to publishing an event to Kafka")
+	ErrWriterClose = errors.New("Couldn't close the kafka writer properly")
 )
 
 // Wrapper to enable an Adapter when working with the generator package
@@ -49,12 +51,16 @@ func (k *PublisherAdapter) Publish(ctx context.Context, event *domain.Event) err
 
 	err = k.writer.WriteMessages(ctx, message)
 	if err != nil {
-		return ErrWriter
+		return ErrWriterPublish
 	}
 
 	return nil
 }
 
 func (k *PublisherAdapter) Close() error {
-	return k.writer.Close()
+	if err := k.writer.Close(); err != nil{
+		return fmt.Errorf("%w: %v", ErrWriterClose, err);
+	}
+
+	return nil
 }

@@ -82,10 +82,6 @@ func (c *ConsumerAdapter) Close() error {
 	if err := c.reader.Close(); err != nil{
 		return fmt.Errorf("%w: %v", ErrReaderClose, err)
 	}
-
-	if (c.reader == nil) {
-		return nil
-	}
 	
 	return nil
 }
