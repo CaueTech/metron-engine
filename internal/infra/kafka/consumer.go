@@ -16,6 +16,7 @@ type ConsumerAdapter struct {
 
 var (
 	ErrReaderFetch = errors.New("Something went wrong in ReadMessage()")
+	ErrReaderClose = errors.New("Failed to close Kafka reader")
 )
 
 func newKafkaReader(brokers []string, topic string, groupID string) *kafka.ReaderConfig {
@@ -76,8 +77,15 @@ func (c *ConsumerAdapter) Consume(ctx context.Context) (<-chan domain.Message, <
 	return messages, errChan
 }
 
-/*
-func (c *ConsumerAdapter) Close() error {
 
+func (c *ConsumerAdapter) Close() error {
+	if err := c.reader.Close(); err != nil{
+		return fmt.Errorf("%w: %v", ErrReaderClose, err)
+	}
+
+	if (c.reader == nil) {
+		return nil
+	}
+	
+	return nil
 }
-*/
