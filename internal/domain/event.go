@@ -23,7 +23,7 @@ func (t EventType) IsValid() bool {
 
 type Event struct {
 	id        uuid.UUID  // ID of the event
-	sourceID  uuid.UUID  // ID of a abstract robot
+	sourceID  uuid.UUID  // ID of an abstract robot
 	eventType EventType  // Discret typing
 	timestamp time.Time  // When the event happened
 }

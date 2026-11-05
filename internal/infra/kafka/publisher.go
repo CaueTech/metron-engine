@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
-	"github.com/CaueTech/metron-engine/internal/infra/proto"
+	"github.com/CaueTech/metron-engine/internal/infra/serial"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -39,7 +39,7 @@ func NewPublisherAdapter(brokers []string, topic string) *PublisherAdapter {
 }
 
 func (k *PublisherAdapter) Publish(ctx context.Context, event *domain.Event) error {
-	bytes, err := proto.Serialize(event)
+	bytes, err := serial.Serialize(event)
 	if err != nil {
 		return err
 	}

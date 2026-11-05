@@ -49,6 +49,7 @@ func generateData() (eventID uuid.UUID, sourceID uuid.UUID, eventType domain.Eve
 func GenerateEvent() (*domain.Event, error) {
 	eventID, sourceID, eventType, timestamp, chaosIndex := generateData()
 
+	// This would break the code so I shouldn't allow these fields to be corrupted (although I need to simulate chaos)
 	err := initValidator(sourceID, eventType)
 	if err != nil {
 		return nil, err
