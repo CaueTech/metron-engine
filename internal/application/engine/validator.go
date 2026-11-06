@@ -8,10 +8,6 @@ import(
 	"github.com/google/uuid"
 )
 
-var(
-	ErrInvalidField = errors.New("an event field was checked invalid")
-)
-
 const (
 	maxFutureTolerance = 1 * time.Minute
 	maxPastTolerance   = 24 * time.Hour 
@@ -30,6 +26,9 @@ func ValidatePayload(event *domain.Event, now time.Time) bool{
 	if event.Timestamp().Before((now.Add(-maxPastTolerance))){
 		return false
 	}
-	
+
+	if event.Type() < EventTypeUnknown || e >= MaxEventType || e == EventTypeUnknown{
+		return false
+	}
 	return true
 }
