@@ -52,3 +52,4 @@ services:
   #     KAFKA_ALERTS_TOPIC: alerts
   #     KAFKA_DLQ_TOPIC: dlq
   #     KAFKA_WARNINGS_TOPIC: warnings
+  #     SLIDING_WINDOW_CAPACITY: 100

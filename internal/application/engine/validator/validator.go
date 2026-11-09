@@ -1,7 +1,6 @@
 package validator
 
 import(
-	"errors"
 	"time"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
@@ -13,8 +12,18 @@ const (
 	maxPastTolerance   = 24 * time.Hour 
 )
 
+type Validator struct{
+	window *slidingManager
+}
+
+func NewValidator (capacity int) *Validator{
+	return &Validator{
+		window: newSlidingManager(capacity),
+	}
+}
+
 // Still lacks EventID and EventType verification
-func ValidatePayload(event *domain.Event, now time.Time) bool{
+func (v *Validator) ValidatePayload(event *domain.Event, now time.Time) bool{
 	if(event.SourceID() == uuid.Nil){
 		return false
 	}
@@ -27,8 +36,15 @@ func ValidatePayload(event *domain.Event, now time.Time) bool{
 		return false
 	}
 
-	if event.Type() < EventTypeUnknown || e >= MaxEventType || e == EventTypeUnknown{
+	e := event.Type()
+
+	if e < domain.EventTypeUnknown || e >= domain.MaxEventType || e == domain.EventTypeUnknown{
 		return false
 	}
+	
+	if(event.ID() == uuid.Nil || !v.window.check(event.ID())){
+		return false
+	}
+	
 	return true
 }
