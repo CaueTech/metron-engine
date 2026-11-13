@@ -22,7 +22,6 @@ func NewValidator (capacity int) *Validator{
 	}
 }
 
-// Still lacks EventID and EventType verification
 func (v *Validator) ValidatePayload(event *domain.Event, now time.Time) bool{
 	if(event.SourceID() == uuid.Nil){
 		return false
