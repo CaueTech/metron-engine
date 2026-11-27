@@ -56,15 +56,15 @@ func (k *PublisherAdapter) Publish(ctx context.Context, event *domain.Event) err
 
 	err = k.writer.WriteMessages(ctx, message)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrWriterPublish, err)
+		return fmt.Errorf("%w: %w", ErrWriterPublish, err)
 	}
 
 	return nil
 }
 
 func (k *PublisherAdapter) Close() error {
-	if err := k.writer.Close(); err != nil{
-		return fmt.Errorf("%w: %v", ErrWriterClose, err);
+	if err := k.writer.Close(); err != nil {
+		return fmt.Errorf("%w: %w", ErrWriterClose, err)
 	}
 
 	return nil

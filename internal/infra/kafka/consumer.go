@@ -17,7 +17,8 @@ const commitTimeout = 5 * time.Second
 var _ domain.EventConsumer = (*ConsumerAdapter)(nil)
 
 type ConsumerAdapter struct {
-	reader *kafka.Reader
+	reader  *kafka.Reader
+	pending *kafka.Message
 }
 
 var (
@@ -43,15 +44,30 @@ func NewConsumerAdapter(brokers []string, topic string, groupID string) *Consume
 
 // Consume blocks the calling goroutine, fetching messages sequentially and invoking handler.
 // Offsets are committed only when handler returns nil, preserving at-least-once delivery.
+// If handler or CommitMessages fails, the uncommitted message is retained and redelivered
+// on the next Consume call before fetching newer messages, preventing later offsets from
+// being committed ahead of an uncommitted failure.
 func (c *ConsumerAdapter) Consume(ctx context.Context, handler domain.MessageHandler) error {
 	for {
-		msg, err := c.reader.FetchMessage(ctx)
-		if err != nil {
-			// Expected termination signals during graceful shutdown.
-			if errors.Is(err, context.Canceled) || errors.Is(err, io.EOF) {
-				return nil
+		var msg kafka.Message
+		if c.pending != nil {
+			if err := ctx.Err(); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				return err
 			}
-			return fmt.Errorf("%w: %v", ErrReaderFetch, err)
+			msg = *c.pending
+		} else {
+			fetched, err := c.reader.FetchMessage(ctx)
+			if err != nil {
+				// Expected termination signals during graceful shutdown.
+				if errors.Is(err, context.Canceled) || errors.Is(err, io.EOF) {
+					return nil
+				}
+				return fmt.Errorf("%w: %w", ErrReaderFetch, err)
+			}
+			msg = fetched
 		}
 
 		messageEntity := domain.Message{
@@ -60,23 +76,27 @@ func (c *ConsumerAdapter) Consume(ctx context.Context, handler domain.MessageHan
 		}
 
 		if err := handler(ctx, messageEntity); err != nil {
+			c.pending = &msg
 			return err
 		}
 
 		// Use a bounded background context so an in-flight commit can complete
 		// during graceful shutdown without hanging indefinitely if the broker is unreachable.
 		commitCtx, cancel := context.WithTimeout(context.Background(), commitTimeout)
-		err = c.reader.CommitMessages(commitCtx, msg)
+		err := c.reader.CommitMessages(commitCtx, msg)
 		cancel()
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrReaderCommit, err)
+			c.pending = &msg
+			return fmt.Errorf("%w: %w", ErrReaderCommit, err)
 		}
+
+		c.pending = nil
 	}
 }
 
 func (c *ConsumerAdapter) Close() error {
 	if err := c.reader.Close(); err != nil {
-		return fmt.Errorf("%w: %v", ErrReaderClose, err)
+		return fmt.Errorf("%w: %w", ErrReaderClose, err)
 	}
 
 	return nil
