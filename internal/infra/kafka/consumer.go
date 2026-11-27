@@ -3,20 +3,28 @@ package kafka
 import (
 	"context"
 	"errors"
-	"io"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
 	"github.com/segmentio/kafka-go"
 )
 
+const commitTimeout = 5 * time.Second
+
+// Compile-time check to ensure ConsumerAdapter satisfies domain.EventConsumer.
+var _ domain.EventConsumer = (*ConsumerAdapter)(nil)
+
 type ConsumerAdapter struct {
-	reader *kafka.Reader
+	reader  *kafka.Reader
+	pending *kafka.Message
 }
 
 var (
-	ErrReaderFetch = errors.New("Something went wrong in ReadMessage()")
-	ErrReaderClose = errors.New("Failed to close Kafka reader")
+	ErrReaderFetch  = errors.New("failed to fetch message from Kafka")
+	ErrReaderCommit = errors.New("failed to commit Kafka offset")
+	ErrReaderClose  = errors.New("failed to close Kafka reader")
 )
 
 func newKafkaReader(brokers []string, topic string, groupID string) *kafka.ReaderConfig {
@@ -34,54 +42,62 @@ func NewConsumerAdapter(brokers []string, topic string, groupID string) *Consume
 	// May look weird, but NewReader() function needs a struct from ReaderConfig first
 }
 
-func (c *ConsumerAdapter) Consume(ctx context.Context) (<-chan domain.Message, <-chan error) {
-	messages := make(chan domain.Message)
-	errChan := make(chan error, 1)
-	
-	go func(){
-		defer close(messages)
-		defer close(errChan)
-
-		for {
-			msg, err := c.reader.FetchMessage(ctx)
-
-			if err != nil{
-				// These are expected errors, no need for signaling it to the terminal
-				if errors.Is(err, context.Canceled) || errors.Is(err, io.EOF){
-					return
+// Consume blocks the calling goroutine, fetching messages sequentially and invoking handler.
+// Offsets are committed only when handler returns nil, preserving at-least-once delivery.
+// If handler or CommitMessages fails, the uncommitted message is retained and redelivered
+// on the next Consume call before fetching newer messages, preventing later offsets from
+// being committed ahead of an uncommitted failure.
+func (c *ConsumerAdapter) Consume(ctx context.Context, handler domain.MessageHandler) error {
+	for {
+		var msg kafka.Message
+		if c.pending != nil {
+			if err := ctx.Err(); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
 				}
-
-				select{
-				case errChan <- fmt.Errorf("%w: %v", ErrReaderFetch, err):
-				default: // Just to prevent blocking in case of errors being unaccessible
+				return err
+			}
+			msg = *c.pending
+		} else {
+			fetched, err := c.reader.FetchMessage(ctx)
+			if err != nil {
+				// Expected termination signals during graceful shutdown.
+				if errors.Is(err, context.Canceled) || errors.Is(err, io.EOF) {
+					return nil
 				}
-				return
+				return fmt.Errorf("%w: %w", ErrReaderFetch, err)
 			}
-
-			messageEntity := domain.Message{
-				Payload: msg.Value,
-				Timestamp: msg.Time,
-				Ack: func () error{
-					return c.reader.CommitMessages(context.Background(), msg)
-				},
-			}
-
-			select{
-			case <-ctx.Done():
-				return
-			case messages <- messageEntity:
-			}
+			msg = fetched
 		}
-	}()
 
-	return messages, errChan
+		messageEntity := domain.Message{
+			Payload:   msg.Value,
+			Timestamp: msg.Time,
+		}
+
+		if err := handler(ctx, messageEntity); err != nil {
+			c.pending = &msg
+			return err
+		}
+
+		// Use a bounded background context so an in-flight commit can complete
+		// during graceful shutdown without hanging indefinitely if the broker is unreachable.
+		commitCtx, cancel := context.WithTimeout(context.Background(), commitTimeout)
+		err := c.reader.CommitMessages(commitCtx, msg)
+		cancel()
+		if err != nil {
+			c.pending = &msg
+			return fmt.Errorf("%w: %w", ErrReaderCommit, err)
+		}
+
+		c.pending = nil
+	}
 }
 
-
 func (c *ConsumerAdapter) Close() error {
-	if err := c.reader.Close(); err != nil{
-		return fmt.Errorf("%w: %v", ErrReaderClose, err)
+	if err := c.reader.Close(); err != nil {
+		return fmt.Errorf("%w: %w", ErrReaderClose, err)
 	}
-	
+
 	return nil
 }
