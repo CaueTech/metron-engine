@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -62,44 +63,49 @@ func TestValidatePayload_Rules(t *testing.T) {
 	validTimestamp := now
 
 	tests := []struct {
-		name      string
-		event     *domain.Event
-		wantValid bool
+		name    string
+		event   *domain.Event
+		wantErr error
 	}{
 		{
-			name:      "valid event",
-			event:     domain.NewEvent(uuid.New(), validSourceID, validType, validTimestamp),
-			wantValid: true,
+			name:    "valid event",
+			event:   domain.NewEvent(uuid.New(), validSourceID, validType, validTimestamp),
+			wantErr: nil,
 		},
 		{
-			name:      "nil sourceID is rejected",
-			event:     domain.NewEvent(uuid.New(), uuid.Nil, validType, validTimestamp),
-			wantValid: false,
+			name:    "nil event is rejected",
+			event:   nil,
+			wantErr: ErrNilEvent,
 		},
 		{
-			name:      "nil event ID is rejected",
-			event:     domain.NewEvent(uuid.Nil, validSourceID, validType, validTimestamp),
-			wantValid: false,
+			name:    "nil sourceID is rejected",
+			event:   domain.NewEvent(uuid.New(), uuid.Nil, validType, validTimestamp),
+			wantErr: ErrInvalidSourceID,
 		},
 		{
-			name:      "far future timestamp rejected",
-			event:     domain.NewEvent(uuid.New(), validSourceID, validType, now.Add(2*time.Minute)),
-			wantValid: false,
+			name:    "nil event ID is rejected",
+			event:   domain.NewEvent(uuid.Nil, validSourceID, validType, validTimestamp),
+			wantErr: ErrInvalidEventID,
 		},
 		{
-			name:      "far past timestamp rejected",
-			event:     domain.NewEvent(uuid.New(), validSourceID, validType, now.Add(-25*time.Hour)),
-			wantValid: false,
+			name:    "far future timestamp rejected",
+			event:   domain.NewEvent(uuid.New(), validSourceID, validType, now.Add(2*time.Minute)),
+			wantErr: ErrTimestampFuture,
 		},
 		{
-			name:      "unknown event type rejected",
-			event:     domain.NewEvent(uuid.New(), validSourceID, domain.EventTypeUnknown, validTimestamp),
-			wantValid: false,
+			name:    "far past timestamp rejected",
+			event:   domain.NewEvent(uuid.New(), validSourceID, validType, now.Add(-25*time.Hour)),
+			wantErr: ErrTimestampPast,
 		},
 		{
-			name:      "sentinel MaxEventType rejected",
-			event:     domain.NewEvent(uuid.New(), validSourceID, domain.MaxEventType, validTimestamp),
-			wantValid: false,
+			name:    "unknown event type rejected",
+			event:   domain.NewEvent(uuid.New(), validSourceID, domain.EventTypeUnknown, validTimestamp),
+			wantErr: ErrInvalidEventType,
+		},
+		{
+			name:    "sentinel MaxEventType rejected",
+			event:   domain.NewEvent(uuid.New(), validSourceID, domain.MaxEventType, validTimestamp),
+			wantErr: ErrInvalidEventType,
 		},
 	}
 
@@ -107,8 +113,8 @@ func TestValidatePayload_Rules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			val := NewValidator(100)
 			got := val.ValidatePayload(tt.event, now)
-			if got != tt.wantValid {
-				t.Errorf("ValidatePayload() = %v, want %v", got, tt.wantValid)
+			if !errors.Is(got, tt.wantErr) {
+				t.Errorf("ValidatePayload() = %v, want %v", got, tt.wantErr)
 			}
 		})
 	}
@@ -123,12 +129,12 @@ func TestValidatePayload_StatefulDeduplication(t *testing.T) {
 	event2 := domain.NewEvent(sharedID, uuid.New(), domain.EventTypeOverheat, now)
 
 	// First occurrence must pass
-	if !val.ValidatePayload(event1, now) {
-		t.Fatal("first event with sharedID should be valid")
+	if err := val.ValidatePayload(event1, now); err != nil {
+		t.Fatalf("first event with sharedID should be valid, got: %v", err)
 	}
 
-	// Reusing the same event ID on the same Validator instance must be rejected
-	if val.ValidatePayload(event2, now) {
-		t.Fatal("second event with duplicate ID should be rejected by Validator")
+	// Reusing the same event ID on the same Validator instance must be rejected as duplicate
+	if err := val.ValidatePayload(event2, now); !errors.Is(err, ErrDuplicateEvent) {
+		t.Fatalf("second event with duplicate ID should return ErrDuplicateEvent, got: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package validator
 
-import(
+import (
+	"errors"
 	"time"
 
 	"github.com/CaueTech/metron-engine/internal/domain"
@@ -9,41 +10,60 @@ import(
 
 const (
 	maxFutureTolerance = 1 * time.Minute
-	maxPastTolerance   = 24 * time.Hour 
+	maxPastTolerance   = 24 * time.Hour
 )
 
-type Validator struct{
+var (
+	ErrNilEvent         = errors.New("event cannot be nil")
+	ErrInvalidSourceID  = errors.New("source ID is nil")
+	ErrInvalidEventID   = errors.New("event ID is nil")
+	ErrTimestampFuture  = errors.New("event timestamp exceeds future tolerance")
+	ErrTimestampPast    = errors.New("event timestamp exceeds past tolerance")
+	ErrInvalidEventType = errors.New("event type is invalid")
+	ErrDuplicateEvent   = errors.New("event ID already processed")
+)
+
+type Validator struct {
 	window *slidingManager
 }
 
-func NewValidator (capacity int) *Validator{
+func NewValidator(capacity int) *Validator {
 	return &Validator{
 		window: newSlidingManager(capacity),
 	}
 }
 
-func (v *Validator) ValidatePayload(event *domain.Event, now time.Time) bool{
-	if(event.SourceID() == uuid.Nil){
-		return false
+// ValidatePayload checks domain invariants and deduplicates by event ID.
+// Returns nil if valid, or a sentinel error identifying the rejection reason
+// so callers can route duplicates differently from DLQ-bound invalid events.
+func (v *Validator) ValidatePayload(event *domain.Event, now time.Time) error {
+	if event == nil {
+		return ErrNilEvent
 	}
 
-	if(event.Timestamp().After(now.Add(maxFutureTolerance))){
-		return false
+	if event.SourceID() == uuid.Nil {
+		return ErrInvalidSourceID
 	}
 
-	if event.Timestamp().Before((now.Add(-maxPastTolerance))){
-		return false
+	if event.Timestamp().After(now.Add(maxFutureTolerance)) {
+		return ErrTimestampFuture
 	}
 
-	e := event.Type()
+	if event.Timestamp().Before(now.Add(-maxPastTolerance)) {
+		return ErrTimestampPast
+	}
 
-	if e < domain.EventTypeUnknown || e >= domain.MaxEventType || e == domain.EventTypeUnknown{
-		return false
+	if !event.Type().IsValid() {
+		return ErrInvalidEventType
 	}
-	
-	if(event.ID() == uuid.Nil || !v.window.check(event.ID())){
-		return false
+
+	if event.ID() == uuid.Nil {
+		return ErrInvalidEventID
 	}
-	
-	return true
+
+	if !v.window.check(event.ID()) {
+		return ErrDuplicateEvent
+	}
+
+	return nil
 }
